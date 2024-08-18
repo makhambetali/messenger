@@ -286,7 +286,6 @@
                 }
                 messageDiv.setAttribute('data-message-id', id)
 
-            // messageDiv.dataset.messageId = data.messageId; // Store message ID
                 document.querySelector("#id_message_send_input").value = "";
                 chatLog.appendChild(messageDiv);
             }
@@ -301,7 +300,6 @@
             }
         };
 
-        // Right-click context menu functionality
         chatLog.addEventListener('contextmenu', function (e) {
             e.preventDefault();
             if (e.target.classList.contains('user-message')) {
@@ -329,7 +327,6 @@
                     messageId: messageId,
                     message: newMessage
                 }))
-                // Add your edit logic here
                 selectedMessageElement.innerText = newMessage 
                 contextMenu.style.display = 'none';
             }
@@ -340,7 +337,6 @@
             if (selectedMessageElement) {
                 const messageId = selectedMessageElement.dataset.messageId;
                 if (confirm(`Are you sure you want to delete message ID: ${messageId}?`)) {
-                    // Send delete request or handle delete locally
                     chatSocket.send(JSON.stringify({
                         action: "delete",
                         messageId: messageId,

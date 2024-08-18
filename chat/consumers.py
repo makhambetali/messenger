@@ -49,8 +49,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             username = text_data_json["username"]
             room = text_data_json["room"]
         
-            # Сохраняем сообщение в базе данных
-            var = await self.save_message(username, message, room)
+            id = await self.save_message(username, message, room)
             # Отправляем сообщение в комнату группы
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -59,13 +58,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "message": message,
                     "username": username,
                     "room": room,
-                    "id":var
+                    "id":id
                 }
                 
             )
         elif action == "delete":
             id =  text_data_json["messageId"]
-            # print(id)
             await self.delete_message(id)
             await self.channel_layer.group_send(
                     self.room_group_name,
@@ -86,8 +84,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {
                     "type":"editMessage",
                     "id" : id,
+                    "message":message,
                     "action":"edit",
-                    "message":message
                 }
             )
             
@@ -97,7 +95,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         username = event["username"]
         room = event["room"]
         id = event["id"]
-        # print("var:", var)
         await self.send(text_data=json.dumps({
             "action":"create",
             "message": message,
