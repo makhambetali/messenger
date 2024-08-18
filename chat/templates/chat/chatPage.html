@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Page</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.8.1/font/bootstrap-icons.min.css">
+
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -165,9 +167,35 @@
                 display: none;
             }
         }
+        .context-menu {
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            min-width: 150px;
+        }
+
+        .context-menu a {
+            display: block;
+            padding: 8px 12px;
+            text-decoration: none;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .context-menu a:hover {
+            background-color: #f0f0f0;
+        }
+
+        .context-menu .icon {
+            margin-right: 8px;
+        }
     </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
     <div class="container">
         <div class="chat-header">
             <div class="profile">
@@ -182,9 +210,9 @@
         <div class="chat-log" id="id_chat_item_container">
             {% for message in messages %}
             {% if message.username == request.user %}
-            <div class="user-message">{{ message.message }}</div>
+            <div class="user-message" data-message-id="{{ message.id }}">{{ message.message }}</div>
             {% else %}
-            <div class="other-message">{{ message.message }}</div>
+            <div class="other-message" data-message-id="{{ message.id }}">{{ message.message }}</div>
             {% endif %}
             {% empty %}
             <div class="no-messages">No messages yet. Start the conversation!</div>
@@ -197,10 +225,19 @@
         </div>
     </div>
 
+    <!-- Context Menu -->
+    <div id="context-menu" class="context-menu">
+        <a href="#" id="edit-message"><i class="bi bi-pencil icon"></i>Edit</a>
+        <a href="#" id="delete-message"><i class="bi bi-trash icon"></i>Delete</a>
+    </div>
+
     <script>
         const roomName = "{{ room }}";
         const user = "{{ request.user }}";
         const chatSocket = new WebSocket("ws://" + window.location.host + "/ws/chat/" + roomName + "/");
+        const chatLog = document.querySelector("#id_chat_item_container");
+        const contextMenu = document.querySelector("#context-menu");
+        let selectedMessageElement = null;
 
         chatSocket.onopen = function (e) {
             console.log("The connection was set up successfully!");
@@ -222,32 +259,97 @@
             var messageInput = document.querySelector("#id_message_send_input").value;
             if (messageInput.length != 0) {
                 chatSocket.send(JSON.stringify({
+                    action: "create",
                     message: messageInput,
                     username: "{{ request.user.username }}",
                     room: roomName
                 }));
-                document.querySelector('.no-messages').style.display = 'none'
+                if(document.querySelector('.no-messages')){
+                    document.querySelector('.no-messages').style.display = 'none'
+                }
             }
         };
 
         chatSocket.onmessage = function (e) {
             const data = JSON.parse(e.data);
-            const chatLog = document.querySelector("#id_chat_item_container");
+            console.log(data.action)
+            if(data.action == "create"){
+                const messageDiv = document.createElement("div");
+                id = data.id
+                if (user == data.username) {
+                    messageDiv.classList.add('user-message');
+                    messageDiv.innerText = data.message;
+                    
+                } else {
+                    messageDiv.classList.add('other-message');
+                    messageDiv.innerText = data.message;
+                }
+                messageDiv.setAttribute('data-message-id', id)
 
-            const messageDiv = document.createElement("div");
-
-            if (user == data.username) {
-                messageDiv.classList.add('user-message');
-                messageDiv.innerText = data.message;
-            } else {
-                messageDiv.classList.add('other-message');
-                messageDiv.innerText = data.message;
+            // messageDiv.dataset.messageId = data.messageId; // Store message ID
+                document.querySelector("#id_message_send_input").value = "";
+                chatLog.appendChild(messageDiv);
             }
+            else if (data.action == "delete"){
+                if(document.querySelector(`[data-message-id="${data.id}"]`)){
 
-            document.querySelector("#id_message_send_input").value = "";
-            chatLog.appendChild(messageDiv);
-            chatLog.scrollTop = chatLog.scrollHeight; // Scroll to bottom
+                    document.querySelector(`[data-message-id="${data.id}"]`).remove();
+                }
+            }
+            else if (data.action == "edit"){
+                document.querySelector(`[data-message-id="${data.id}"]`).innerText = data.message
+            }
         };
+
+        // Right-click context menu functionality
+        chatLog.addEventListener('contextmenu', function (e) {
+            e.preventDefault();
+            if (e.target.classList.contains('user-message')) {
+                selectedMessageElement = e.target;
+                const rect = e.target.getBoundingClientRect();
+                contextMenu.style.top = `${rect.bottom + window.scrollY}px`;
+                contextMenu.style.left = `${rect.left + window.scrollX}px`;
+                contextMenu.style.display = 'block';
+            }
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!contextMenu.contains(e.target)) {
+                contextMenu.style.display = 'none';
+            }
+        });
+
+        document.querySelector("#edit-message").addEventListener('click', function (e) {
+            e.preventDefault();
+            if (selectedMessageElement) {
+                const messageId = selectedMessageElement.dataset.messageId;
+                var newMessage = prompt(`Edit message ID: ${messageId}`);
+                chatSocket.send(JSON.stringify({
+                    action:"edit",
+                    messageId: messageId,
+                    message: newMessage
+                }))
+                // Add your edit logic here
+                selectedMessageElement.innerText = newMessage 
+                contextMenu.style.display = 'none';
+            }
+        });
+
+        document.querySelector("#delete-message").addEventListener('click', function (e) {
+            e.preventDefault();
+            if (selectedMessageElement) {
+                const messageId = selectedMessageElement.dataset.messageId;
+                if (confirm(`Are you sure you want to delete message ID: ${messageId}?`)) {
+                    // Send delete request or handle delete locally
+                    chatSocket.send(JSON.stringify({
+                        action: "delete",
+                        messageId: messageId,
+                    }));
+                    selectedMessageElement.remove();
+                }
+                contextMenu.style.display = 'none';
+            }
+        });
     </script>
 </body>
 </html>
