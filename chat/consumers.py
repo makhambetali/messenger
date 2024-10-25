@@ -27,9 +27,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     @sync_to_async
-    def save_message(self, username, message, room):
+    def save_message(self, username, message, room, parent=None):
         user = User.objects.get(username=username)
-        record = Message.objects.create(username=user, message=message, room=room)
+        # parent = Message.objects.get(id = parent)
+        if parent == -1:
+            record = Message.objects.create(username=user, message=message, room=room)
+            
+        else :
+            parent = Message.objects.get(id = parent)
+            record = Message.objects.create(username=user, message=message, room=room, parent = parent)
         record.save()
         return record.id
     @sync_to_async
@@ -48,8 +54,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message = text_data_json["message"]
             username = text_data_json["username"]
             room = text_data_json["room"]
-        
-            id = await self.save_message(username, message, room)
+            parent = text_data_json["parent_id"]
+            id = await self.save_message(username, message, room, parent)
             # Отправляем сообщение в комнату группы
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -58,6 +64,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "message": message,
                     "username": username,
                     "room": room,
+                    "parent":parent,
                     "id":id
                 }
                 
@@ -94,12 +101,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
         message = event["message"]
         username = event["username"]
         room = event["room"]
+        parent = event['parent']
         id = event["id"]
         await self.send(text_data=json.dumps({
             "action":"create",
             "message": message,
             "username": username,
             "room": room,
+            "parent":parent,
             "id":id
         }))
     async def deleteMessage(self, event):

@@ -5,6 +5,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.views import View
 
 from chat.models import Message
+from chat.serializers import MessageCreateSerializer, MessageSerializer
 
 from django.shortcuts import render, redirect
 from django.contrib import messages
@@ -15,6 +16,10 @@ from django.contrib.auth import login as auth_login
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseForbidden
+
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
 def login_user(request):
     if request.method == 'POST':
         form = AuthenticationForm(request, data=request.POST)
@@ -76,7 +81,6 @@ def user_list(request):
 @login_required
 def private_chat(request, user1, user2):
     room = f"{user1}_{user2}" if user1 < user2 else f"{user2}_{user1}"
-    
     if str(request.user.id) in room and (user1 != user2):
         messages = Message.objects.filter(room=room).order_by('timestamp')[:50]
         context = {
@@ -88,3 +92,23 @@ def private_chat(request, user1, user2):
     else:
         return render(request, "chat/noAccess.html")
 
+class MessageCreateView(APIView):
+    """Добавление отзыва к фильму"""
+    def post(self, request):
+        review = MessageCreateSerializer(data=request.data)
+        print("Received data:", request.data)
+        if review.is_valid():
+            review.save()
+            return Response(status=201)
+        else:
+            print("Errors:", review.errors)
+            return Response(review.errors, status=400)
+
+class RoomMessagesView(APIView):
+    """Retrieve all messages for a specific room with nested replies"""
+
+    def get(self, request, room_name):
+        messages = Message.objects.filter(room=room_name)  # get root messages only
+        serializer = MessageSerializer(messages, many=True)
+        return Response(serializer.data)
+    

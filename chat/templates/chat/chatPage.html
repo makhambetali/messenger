@@ -67,40 +67,82 @@
             font-size: 14px;
         }
 
-        .chat-log {
-            min-height: 400px;
-            height: auto;
-            overflow-y: auto;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            background-color: #f9f9f9;
-            margin-bottom: 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
+/* Контейнер для чата */
+/* Фоновое оформление чата */
+.chat-log {
+    min-height: 400px;
+    height: auto;
+    overflow-y: auto;
+    padding: 10px;
+    border-radius: 8px;
+    background-color: #f9f9f9; /* Светлый фон */
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    background-size: cover;
+}
 
-        .chat-log div {
-            margin: 5px 0;
-            padding: 10px;
-            border-radius: 10px;
-            max-width: 75%;
-            word-wrap: break-word;
-        }
+/* Сообщение от другого пользователя */
+.chat-log .other-message {
+    margin-right: auto;
+    background-color: #e9f0fb; /* Светло-синий для сообщений других пользователей */
+    color: #333;
+    padding: 10px 15px;
+    border-radius: 20px;
+    max-width: 70%;
+    font-size: 14px;
+    position: relative;
+    margin-bottom: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Лёгкая тень для эффекта "пузырька" */
+}
 
-        .chat-log div.user-message {
-            margin-left: auto;
-            background-color: #007bff;
-            color: white;
-        }
+/* Сообщение от текущего пользователя */
+.chat-log .user-message {
+    margin-left: auto;
+    background-color: #007bff; /* Основной синий цвет для сообщений пользователя */
+    color: white;
+    padding: 10px 15px;
+    border-radius: 20px;
+    max-width: 70%;
+    position: relative;
+    margin-bottom: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
 
-        .chat-log div.other-message {
-            margin-right: auto;
-            background-color: #e9e9e9;
-            color: #333;
-        }
+/* Основное сообщение */
+.chat-log .message {
+    padding: 8px 12px;
+    background-color: #ffffff; /* Белый фон для текста внутри "пузырька" */
+    border-radius: 10px;
+    font-size: 14px;
+    color: #222;
+    margin-top: 5px;
+}
+
+/* Коренное сообщение (внутри основного) */
+.chat-log .parent-message {
+    padding: 5px 8px;
+    background-color: #0056b3; /* Более тёмный синий для коренных сообщений */
+    font-size: 12px;
+    color: white;
+    border-radius: 10px;
+    margin-bottom: 4px;
+}
+
+/* Часовые метки */
+.chat-log .timestamp {
+    font-size: 11px;
+    color: #888;
+    margin-left: 10px;
+}
+
+
 
         .no-messages {
             font-size: 16px;
@@ -195,7 +237,7 @@
         }
     </style>
 </head>
-<body oncontextmenu="return false;">
+<body >
     <div class="container">
         <div class="chat-header">
             <div class="profile">
@@ -208,15 +250,13 @@
         <center><h1>Chat with {{ receiver }}</h1></center>
 
         <div class="chat-log" id="id_chat_item_container">
-            {% for message in messages %}
-            {% if message.username == request.user %}
-            <div class="user-message" data-message-id="{{ message.id }}">{{ message.message }}</div>
-            {% else %}
-            <div class="other-message" data-message-id="{{ message.id }}">{{ message.message }}</div>
-            {% endif %}
-            {% empty %}
-            <div class="no-messages">No messages yet. Start the conversation!</div>
-            {% endfor %}
+            <div class="other-message">
+                <div class="message">Salem</div>
+            </div>
+            <div class="user-message">
+                <div class="parent-message">Salem</div>
+                <div class="message">Hello</div>
+            </div>
         </div>
 
         <div class="chat-input">
@@ -227,17 +267,67 @@
 
     <!-- Context Menu -->
     <div id="context-menu" class="context-menu">
-        <a href="#" id="edit-message"><i class="bi bi-pencil icon"></i>Edit</a>
-        <a href="#" id="delete-message"><i class="bi bi-trash icon"></i>Delete</a>
+      
     </div>
-
+<style>
+    
+    </style>
     <script>
+        
         const roomName = "{{ room }}";
-        const user = "{{ request.user }}";
-        const chatSocket = new WebSocket("ws://" + window.location.host + "/ws/chat/" + roomName + "/");
-        const chatLog = document.querySelector("#id_chat_item_container");
-        const contextMenu = document.querySelector("#context-menu");
-        let selectedMessageElement = null;
+const user = "{{ request.user }}";
+const user_id = "{{ request.user.id }}";
+const chatSocket = new WebSocket("ws://" + window.location.host + "/ws/chat/" + roomName + "/");
+const chatLog = document.querySelector("#id_chat_item_container");
+const contextMenu = document.querySelector("#context-menu");
+let selectedMessageElement = null;
+
+async function fetchMessages(roomName) {
+    try {
+        const response = await fetch(`/messages/room/${roomName}/`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch messages');
+        }
+
+        const messages = await response.json();
+        const container = chatLog;
+        container.innerHTML = ""; // Clear previous messages
+
+        if (messages.length === 0) {
+            container.innerHTML = `<div class="no-messages">No messages yet. Start the conversation!</div>`;
+        } else {
+            console.log(messages)
+            renderMessages(messages, container);
+        }
+    } catch (error) {
+        console.error("Error:", error);
+    }
+}
+
+function renderMessages(messages, container) {
+    messages.forEach(message => {
+        // Determine the CSS class based on the user ID
+        const containerClass = message.username === +user_id ? 'user-message' : 'other-message';
+        const containerDiv = document.createElement('div');
+        containerDiv.classList.add(containerClass);
+        
+        if(message.parent_id){
+            const parentDiv = document.createElement('div');
+            parentDiv.classList.add("parent-message");
+            parentDiv.textContent = document.querySelector(`[data-message-id = "${message.parent_id}"]`).textContent
+            containerDiv.appendChild(parentDiv)
+          }
+        const messageDiv = document.createElement('div')
+        messageDiv.classList.add('message')
+        messageDiv.innerHTML = message.message
+        messageDiv.setAttribute('data-message-id', message.id)
+        containerDiv.appendChild(messageDiv)
+        chatLog.appendChild(containerDiv);
+    });
+}
+
+fetchMessages(roomName);
+;
 
         chatSocket.onopen = function (e) {
             console.log("The connection was set up successfully!");
@@ -262,7 +352,8 @@
                     action: "create",
                     message: messageInput,
                     username: "{{ request.user.username }}",
-                    room: roomName
+                    room: roomName,
+                    parent_id: -1
                 }));
                 if(document.querySelector('.no-messages')){
                     document.querySelector('.no-messages').style.display = 'none'
@@ -273,21 +364,34 @@
         chatSocket.onmessage = function (e) {
             const data = JSON.parse(e.data);
             console.log(data.action)
+            
             if(data.action == "create"){
+                const containerDiv = document.createElement('div');
+                
                 const messageDiv = document.createElement("div");
+                messageDiv.classList.add('message')
                 id = data.id
+                console.log(data.parent)
+                if(data.parent && +data.parent != -1){
+                    const parentDiv = document.createElement('div');
+                    parentDiv.classList.add("parent-message");
+                    parentDiv.textContent = document.querySelector(`[data-message-id = "${+data.parent}"]`).textContent
+                    containerDiv.appendChild(parentDiv)
+                }
+      
                 if (user == data.username) {
-                    messageDiv.classList.add('user-message');
-                    messageDiv.innerText = data.message;
+                    containerDiv.classList.add('user-message');
+                    
                     
                 } else {
-                    messageDiv.classList.add('other-message');
-                    messageDiv.innerText = data.message;
+                    containerDiv.classList.add('other-message');
+                    
                 }
                 messageDiv.setAttribute('data-message-id', id)
-
+                messageDiv.innerText = data.message;
                 document.querySelector("#id_message_send_input").value = "";
-                chatLog.appendChild(messageDiv);
+                containerDiv.appendChild(messageDiv)
+                chatLog.appendChild(containerDiv);
             }
             else if (data.action == "delete"){
                 if(document.querySelector(`[data-message-id="${data.id}"]`)){
@@ -301,14 +405,29 @@
         };
 
         chatLog.addEventListener('contextmenu', function (e) {
+            console.log('1')
             e.preventDefault();
-            if (e.target.classList.contains('user-message')) {
-                selectedMessageElement = e.target;
-                const rect = e.target.getBoundingClientRect();
-                contextMenu.style.top = `${rect.bottom + window.scrollY}px`;
-                contextMenu.style.left = `${rect.left + window.scrollX}px`;
-                contextMenu.style.display = 'block';
+            console.log(e.target.parentElement.classList =='user-message')
+            // selectedMessageElement = e.target;
+            if (e.target.parentElement.classList == 'user-message' || e.target.parentElement.classList == 'other-message'){
+                selectedMessageElement = e.target.parentElement
             }
+            else{
+                selectedMessageElement = e.target
+            }
+            const rect = e.target.getBoundingClientRect();
+            contextMenu.style.top = `${rect.bottom + window.scrollY}px`;
+            contextMenu.style.left = `${rect.left + window.scrollX}px`;
+            contextMenu.style.display = 'block';
+            if (e.target.classList.contains('user-message') || e.target.parentElement.classList.contains('user-message')) {
+                
+                contextMenu.innerHTML = 
+                '<a href="#" id="reply-message"  onclick="replyMessage(event)"><i class=""></i>Reply</a><a href="#" id="edit-message" onclick="editMessage(event)"><i class="bi bi-pencil icon"></i>Edit</a> <a href="#" id="delete-message" onclick="deleteMessage(event)"><i class="bi bi-trash icon"></i>Delete</a>'
+            }
+            else if(e.target.classList.contains('other-message') || e.target.parentElement.classList.contains('other-message')){
+                contextMenu.innerHTML = '<a href="#" id="reply-message" onclick="replyMessage(event)"><i class=""></i>Reply</a>'
+            }
+            
         });
 
         document.addEventListener('click', function (e) {
@@ -316,26 +435,58 @@
                 contextMenu.style.display = 'none';
             }
         });
-
-        document.querySelector("#edit-message").addEventListener('click', function (e) {
+        const replyMessage = (e) => {
+            // alert()
             e.preventDefault();
+            // alert()
             if (selectedMessageElement) {
-                const messageId = selectedMessageElement.dataset.messageId;
+                const messageId = selectedMessageElement.querySelector('.message').getAttribute('data-message-id');
+                console.log(messageId)
+                var reply = prompt('Enter your reply to message "' + document.querySelector(`[data-message-id="${messageId}"]`).innerHTML + '"')
+                chatSocket.send(JSON.stringify({
+                    action:"create",
+                    message: reply,
+                    username: "{{ request.user.username }}",
+                    room: roomName,
+                    parent_id: messageId
+                }))
+                contextMenu.style.display = 'none';
+            }
+        }
+        // document.querySelector("#edit-message").addEventListener('click', function (e) {
+        //     e.preventDefault();
+        //     if (selectedMessageElement) {
+        //         const messageId = selectedMessageElement.dataset.messageId;
+        //         var newMessage = prompt(`Edit message ID: ${messageId}`);
+        //         chatSocket.send(JSON.stringify({
+        //             action:"edit",
+        //             messageId: messageId,
+        //             message: newMessage
+        //         }))
+        //         selectedMessageElement.innerText = newMessage 
+        //         contextMenu.style.display = 'none';
+        //     }
+        // });
+        const editMessage = (e) => {
+                e.preventDefault();
+            if (selectedMessageElement) {
+                const messageId = selectedMessageElement.querySelector('.message').getAttribute('data-message-id')
                 var newMessage = prompt(`Edit message ID: ${messageId}`);
                 chatSocket.send(JSON.stringify({
                     action:"edit",
                     messageId: messageId,
                     message: newMessage
                 }))
-                selectedMessageElement.innerText = newMessage 
+                selectedMessageElement.querySelector('.message').innerText = newMessage 
                 contextMenu.style.display = 'none';
             }
-        });
+        }
 
-        document.querySelector("#delete-message").addEventListener('click', function (e) {
+
+        const deleteMessage = (e) => {
             e.preventDefault();
             if (selectedMessageElement) {
-                const messageId = selectedMessageElement.dataset.messageId;
+                const messageId = selectedMessageElement.querySelector('.message').getAttribute('data-message-id')
                 if (confirm(`Are you sure you want to delete message ID: ${messageId}?`)) {
                     chatSocket.send(JSON.stringify({
                         action: "delete",
@@ -345,7 +496,7 @@
                 }
                 contextMenu.style.display = 'none';
             }
-        });
+        }
     </script>
 </body>
 </html>
