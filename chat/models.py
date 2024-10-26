@@ -13,3 +13,6 @@ class Message(models.Model):
     def __str__(self):
         return f"{self.username}: {self.message[:50]}"
 
+    @classmethod
+    def get_all_rooms(cls):
+        return cls.objects.values_list('room', flat=True).distinct()

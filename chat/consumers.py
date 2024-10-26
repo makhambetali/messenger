@@ -29,6 +29,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @sync_to_async
     def save_message(self, username, message, room, parent=None):
         user = User.objects.get(username=username)
+        rooms = Message.get_all_rooms()
+        for room_in_db in rooms:
+            if room[::-1] == room_in_db:
+                room = room[::-1]
         # parent = Message.objects.get(id = parent)
         if parent == -1:
             record = Message.objects.create(username=user, message=message, room=room)
