@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+    alert()
     // Если в localStorage нет данных о комнате или получателе, показываем сообщение
     if (!localStorage.getItem('roomName') || !localStorage.getItem('receiver')) {
         const selectChatMessage = document.getElementById('select-chat-message');
